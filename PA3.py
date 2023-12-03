@@ -1,4 +1,5 @@
 import random
+i = 0
 #States
 states = ['RU 8p', 'TU 10p', 'RU 10p', 'RD 10p', 'RU 8a', 'RD 8a', 'TU 10a', 'RU 10a', 'RD 10a', 'TD 10a', '11am class']
 #Actions 
@@ -94,6 +95,9 @@ def monteCarlo(episodes):
     print(f"Final State Values: {stateVal}, Average Reward: {averageReward}")
 
 monteCarlo(50)
+while i<100:
+    print("-", end = "")
+    i+=1
 #need to print to Print out the values of all of the states at the end of your exp
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -110,11 +114,11 @@ def valueIteration(MDP, states):
     limit = 0.001    # limit
     stateValues = initStateValues(states)  # initialzing state values using the function
 
-    delta = limit
+    episodeRewards = limit
     iterations = 0
 
-    while delta >= limit:
-        delta = 0
+    while episodeRewards >= limit:
+        episodeRewards = 0
         for state in states:
             if state == '11am class':  # Skip terminal state
                 continue
@@ -127,7 +131,7 @@ def valueIteration(MDP, states):
                 max_value = max(max_value, total)
 
             stateValues[state] = max_value
-            delta = max(delta, abs(v - stateValues[state]))
+            episodeRewards = max(episodeRewards, abs(v - stateValues[state]))
 
         iterations += 1
 
@@ -151,7 +155,10 @@ def valueIteration(MDP, states):
 
 # Print statements plus unpackage
 stateValues, policy, iterations = valueIteration(MDP, states)
-print(f"Part 2: Number of iterations: {iterations}")
+while i<395:
+    print("-", end = "")
+    i+=1
+print(f"\nPart 2: Number of iterations: {iterations}")
 print(f"Part 2: Final state values: {stateValues}")
 print(f"Part 2: Optimal policy: {policy}")
 
@@ -162,7 +169,7 @@ valueIteration(MDP, states)
 
 
 
-def q_learning(episodes):
+def q_learning(MDP, states, actions):
     alpha = 0.2
     discountRate = 0.99
     alphaDecay = 0.995
@@ -172,36 +179,69 @@ def q_learning(episodes):
     epsilonMin = 0.01
     # Q-values initialization
     qValues = {} # Create an empty dictionary to hold Q-values
+    episode = 0
 
     # initialization of Q-values for each state,action 
     for state in states:
         for action in actions:
             qValues[(state, action)] = 0
-            
-    for episode in range(episodes):
-        currentState = random.choice(states)
-        episodeRewards = 0
 
-        while currentState != '11am class':
-            available_actions = []
-            for action in actions:
-                if action in MDP[currentState]:
-                    available_actions.append(action)
-            
-            if not available_actions:
-                break  # Exit loop if no actions available
-            action = random.choice(available_actions)  # Random equiprobable policy
+    while True:
+        currentState = random.choice(states)
+        episodeRewards = 0  # Track the maxc change in Q values
+
+        while currentState != '11am class': #not terminal
+            # exploration vs exploitation 
+            if random.random() < epsilon: # if less than epsilon (0.1) [exploration value] it chooses random action from curr state
+                action = random.choice([action for action in actions if action in MDP[currentState]])
+            if action == 'any': #handles error "any", rturns first option
+                    action = list(MDP[currentState].keys())[0] 
+
+            if action in MDP[currentState]: #chekc if action in curr state then unpackage to get reward, if not then choose highest Q-value
+                nextState, transition = list(MDP[currentState][action].items())[0]
+                reward = transition['reward']
+            else:
+                action = max((qValues[(currentState, a)], a) for a in actions if (currentState, a) in qValues)[1]
+
+            #update state and reward form MDP map.
             nextState, transition = list(MDP[currentState][action].items())[0]
-            reward = transition['reward']  # Get reward from transition 
+            reward = transition['reward']
+            
+            #New Q-value updated using Q learning rule adn equation: Q(s,a)←Q(s,a)+α⋅(r+γ⋅max , Q(s',a') - Q(s,a)
             prevQValue = qValues[(currentState, action)]
-            maxNextQValue = float('-inf')
-    for nextAction in actions:
-        if nextAction in MDP[nextState]:
-            nextQValue = qValues[(nextState, nextAction)]
-            if nextQValue > maxNextQValue:
-                maxNextQValue = nextQValue
-            newQValue = (1 - alpha) * prevQValue + alpha * (reward + discountRate * maxNextQValue)#q learning formula 
+            maxNextQValue = max(qValues.get((nextState, a), 0) for a in actions if (nextState, a) in qValues)
+
+            newQValue = prevQValue + alpha * (reward + discountRate * maxNextQValue - prevQValue)
             qValues[(currentState, action)] = newQValue
-            currentState = nextState  # Move to the next state
-    print(qValues) 
+
+            # Print Q-value updates
+            print(f"Episodez: {episode}\n, State: {currentState}\n Action {action}: Previous Q-Value: {prevQValue}, New Q-Value: {newQValue}\n Reward: {reward}")
+
+            episodeRewards = max(episodeRewards, abs(newQValue - prevQValue)) # getting the highest reward
+            currentState = nextState
+
+        # Check for convergence
+        if episodeRewards < 0.001:
+            break
+
+        # Decay learning and exploration rates
+        alpha = max(alpha * alphaDecay, alphaMin)
+        epsilon = max(epsilon * epsilonDecay, epsilonMin)
+        episode +=1
+
+    # getting policy from Q-values
+    policy = {state: max((qValues.get((state, a), float('-inf')), a) for a in actions)[1] for state in states if state != '11am class'}
+
+    return qValues, policy, episode
+
+# Run Q-Learning
+qValues, policy, totalEpisodes = q_learning(MDP, states, actions)
+while i<395:
+    print("-", end = "")
+    i+=1
+
+print(f"\nPart 3: Total Episodes: {totalEpisodes}")
+print("Part 3: Final Q Values:", qValues)
+print("Part 3: Optimal Policy:", policy)
+
            
